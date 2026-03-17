@@ -13,7 +13,6 @@ We will be using phyloseq version 5.2.1 during this workshop. Before attending, 
 # Install required packages:
 
 install.packages(c("Phyloseq", "vegan", "ape", "dplyr", "ggplot2", "ggpubr", "corncob", "patchwork"))
-
 ```
 After installing all packages, restart your RStudio. This allows for all libraries to load cleanly and ensures that any cached or corrupted session data doesn’t interfere with the newly installed packages.
 
@@ -21,14 +20,7 @@ After installing all packages, restart your RStudio. This allows for all librari
 On the day of the workshop, please ensure that you have loaded the required R packages. The microbiome data we will be using are provided in the corncob package, specifically fecal microbiome profiles from patients with and without inflammatory bowel disease (IBD), along with other relevant patient‑level metadata. These data originate from the following publication, which examined microbial community structure in relation to IBD status: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0039242
 ``` {r download}
 # Load packages
-library(c("Phyloseq",
-          "vegan",
-          "ape",
-          "dplyr",
-          "ggplot2",
-          "ggpubr",
-          "corncob",
-          "patchwork"))
+library(c("Phyloseq", "vegan", "ape", "dplyr", "ggplot2", "ggpubr", "corncob", "patchwork"))
 
 # Download data from the corncob package
 data("ibd_phylo_sample")
@@ -43,16 +35,22 @@ TAX <- tax_table(ibd_phylo_taxa)
 # Create our phyloseq object
 ibd <- phyloseq(OTU, TAX, metadata) # optional variable TREE
 ibd
-
-# What do these variables look like?
-otu_table(ibd)
-tax_table(ibd)
-sam_data(ibd)
 ```
 ## Exploring Data
-To familiarize ourselves with the structure of a phyloseq object, we will examine its key components: the OTU table, the taxonomic table, and the sample metadata associated with our dataset. For the purposes of this workshop, we will work with a subset of the full dataset to create a smaller, more manageable phyloseq object. Additional ways to upload data, subset, filter, and manipulate phyloseq objects can be found here: https://bioconductor.posit.co/packages/release/bioc/vignettes/phyloseq/inst/doc/phyloseq-basics.html
+To familiarize ourselves with the structure of a phyloseq object, we will examine its key components: the Operational Taxonomic Unit (**OTU**) or Amplicon Sequence Variant (**ASV**) table, the **taxon** table, and the sample **metadata** associated with our dataset. For the purposes of this workshop, we will work with a subset of the full dataset to create a smaller, more manageable phyloseq object. Additional ways to upload data, subset, filter, and manipulate phyloseq objects can be found here: https://bioconductor.posit.co/packages/release/bioc/vignettes/phyloseq/inst/doc/phyloseq-basics.html
 ``` {r phyloseq}
+# Let's look at our OTU/ASV Table
+otu_table(ibd)
+colnames(otu_table(ibd))
+rownames(otu_table(ibd))
+
+# Let's look at our Tax Table
+tax_table(ibd)
+colnames(tax_table(ibd))
+rownames(tax_table(ibd))
+
 # Let's look at our sample metadata
+sample_data(ibd)
 colnames(ibd@sam_data)
 unique(ibd@sam_data$DiseaseState)
 unique(ibd@sam_data$activity)
@@ -62,33 +60,47 @@ View(ibd@sam_data)
 # Create a smaller object
 set.seed(1234)
 myData <- subset_samples(ibd, DiseaseState %in% c("UC", "nonIBD"))
-random_samples <- sample(sample_names(myData), 10)
+random_samples <- sample(sample_names(myData), 12)
 myData <- prune_samples(random_samples, myData)
-plot_bar(myData, fill = "Phylum")
+myData
+saveRDS(myData, "IBD_Phyloseq_Workshop.R")
 
-# Relative Abundance for Bar Plot
+plot_bar(myData, fill = "Phylum")
+```
+# Relative Abundance Plots
+**Relative abundance** plots are commonly used in microbiome analysis to visualize the composition of microbial communities across samples. Instead of displaying raw counts, these plots show the proportion of each taxon within a sample, allowing for direct comparison even when sequencing depths differ. By converting raw counts to relative abundances, these plots highlight dominant taxa and major shifts in microbial composition. They are often summarized at broader taxonomic levels and typically visualized as stacked bar charts for easy interpretation.
+```{r abundance}
+# Transforming Data
 myData.rel <- transform_sample_counts(myData, function(x) x / sum(x))
 
 # Visualize data based on Disease State
-p <- plot_bar(myData.rel, fill = "Phylum")
-p
-p2 <- p + facet_wrap(~DiseaseState, scales= "free_x")
-p2
+Rel_abun_barplot <- plot_bar(myData.rel, fill = "Phylum", title = "Relative Abundance Plot")
+Rel_abun_barplot
+
+Rel_abun_barplot.2 <- Rel_abun_barplot + facet_wrap(~DiseaseState, scales= "free_x")
+Rel_abun_barplot.2
+
+ggsave("output/Relative_Abundance_Phylum_Barplot.tiff", Rel_abun_barplot.2)
 
 # Visualize data on other metadata
-p3 <- p + facet_wrap(gender~DiseaseState, scales= "free_x")
-p3
+Rel_abun_barplot.3 <- Rel_abun_barplot +
+                        facet_wrap(activity~DiseaseState, scales= "free_x", nrow = 1)
+Rel_abun_barplot.3
+
+ggsave("output/Relative_Abundance_Phylum_Barplot_activity.tiff", Rel_abun_barplot.3)
 
 # Visualize specific Phyla
 Firm <- subset_taxa(myData.rel, Phylum == "Firmicutes")
 
-plot_bar(Firm, fill = "Genus") +
-  facet_wrap(~DiseaseState, scales= "free_x")
+plot_bar(Firm, fill = "Phylum") +
+  facet_wrap(activity~DiseaseState, scales= "free_x", nrow=1)
 
-plot_bar(Firm, fill = "Genus") +
-  facet_wrap(~DiseaseState, scales= "free_x") +
-  theme(legend.text  = element_text(size = 4),
-        legend.key.size = unit(0.3, "cm"))
+Firm_abun_barplot <- plot_bar(Firm, fill = "Family", title = "Relative Abundance - Firmicutes") +
+                       facet_wrap(activity~DiseaseState, scales= "free_x", nrow=1) +
+                       theme(legend.text = element_text(size = 4),
+                             legend.key.size = unit(0.3, "cm"))
+Firm_abun_barplot
+ggsave("output/Firmicutes_Abundance_Barplot.tiff", Firm_abun_barplot)
 ```
 ## Alpha Diversity
 In microbiome studies, **alpha diversity** refers to how many different taxa are present (richness) and how evenly those taxa are distributed (evenness) within a single ecological community or sample. Alpha diversity metrics help characterize the complexity of a microbial community by quantifying not only the total number of species or operational taxonomic units (OTUs/ASVs), but also how dominant or rare those species are relative to one another.
@@ -103,12 +115,16 @@ In phyloseq, the function plot_richness() provides a convenient way to compute a
 - **Fisher’s alpha** – a richness estimator based on the log-series distribution.
 
 Together, these metrics offer complementary perspectives on community structure, enabling a more comprehensive characterization of within-sample microbial diversity.
-``` {r phyloseq}
+``` {r alpha}
+alpha <- estimate_richness(myData)
+write.csv(alpha, "files/Alpha_Diversity.csv")
+
 plot_richness(myData)
 plot_richness(myData, x = "DiseaseState")
-plot_richness(myData, measures = "Shannon", x = "DiseaseState")
-ad <- plot_richness(myData, measures = "Shannon", x = "DiseaseState", color = "age", shape = "gender")
+plot_richness(myData, measures = "Shannon", x = "DiseaseState", color = "activity")
+ad <- plot_richness(myData, measures = "Shannon", x = "DiseaseState", color = "activity")
 ad
+ggsave("output/Alpha_Diversity_Shannon.tiff", ad)
 
 # What happens when we use our relative abundance data?
 plot_richness(myData.rel, x = "DiseaseState") # this should return an error
@@ -119,25 +135,31 @@ ad / ad.rel
 ## Beta Diversity and PERMONOVA
 Beta diversity measures differences in microbial community composition between samples, helping identify how treatments, environments, or conditions influence overall community structure. It complements alpha diversity by focusing on between‑sample variation rather than within‑sample richness. Principal Coordinates Analysis (**PCoA**) is a common ordination method used to visualize beta diversity. It takes a distance matrix and projects samples into a reduced number of dimensions so that the distances between points approximate their ecological dissimilarity.
 A widely used distance metric for microbiome studies is **Bray–Curtis** dissimilarity, which quantifies differences based on shared taxa and their abundances. Values range from 0 (identical) to 1 (completely different), making it intuitive for evaluating compositional changes.
-To formally test whether groups differ in beta diversity, researchers typically use **PERMANOVA**. This non‑parametric method assesses whether the multivariate centroids of groups differ significantly using permutation-based inference. In R, the vegan package implements PERMANOVA through adonis2().
-``` {r phyloseq}
+To test statistically whether groups differ in beta diversity, we will use **PERMANOVA**. This non‑parametric method assesses whether the multivariate centroids of groups differ significantly using permutation-based inference. In R, the vegan package implements PERMANOVA through adonis2().
+``` {r beta}
 # Which distance methods are available
 distanceMethodList
 
 # Let's use Bray-Curtis dissimilarity
-Dist <- distance(myData, method="Bray")
-MDS <- ordinate(myData, "PCoA", distance=Dist)
-p <- plot_ordination(myData, MDS, color="DiseaseState")
-p
-p + stat_ellipse()
+Dist <- distance(myData, method="bray")
+Dist
+write.csv(Dist, "files/Distance_matrix_Bray.csv)
+
+PCoA <- ordinate(myData, "PCoA", distance=Dist)
+PCoA$vectors #ordination results are in 'vectors'
+write.csv(PCoA$vectors, "files/Bray_ordination.csv)
+
+bray <- plot_ordination(myData, PCoA, color="DiseaseState")
+bray
+bray + stat_ellipse()
 
 # Let's use our ordination plot to run PERMANOVA
 adonis_res <- adonis2(Dist ~ myData@sam_data$DiseaseState)
 adonis_res
 
-p2 <- p + stat_ellipse() +
-  labs(title = "Beta-Diversity by Disease State",
-  subtitle = paste("Bray-Curtis PERMANOVA p =", format(adonis_res$`Pr(>F)`[1], digits = 3)))
+bray <- bray + stat_ellipse() +
+          labs(title = "Beta-Diversity",
+               subtitle = paste("Bray-Curtis, p =", format(adonis_res$`Pr(>F)`[1])))
 
-ggsave()
+ggsave("output/Bray-Curtis_dissimilarity.tiff", bray)
 ```
