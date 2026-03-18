@@ -29,6 +29,12 @@ library("ggpubr")
 library("corncob")
 library("patchwork")
 
+# File set-up
+dir.create("Microbiomics/")
+setwd("Microbiomics/")
+dir.create("plots/")
+dir.create("files/")
+
 # Download data from the corncob package
 data("ibd_phylo_sample")
 data("ibd_phylo_otu")
@@ -66,8 +72,10 @@ View(ibd@sam_data)
 
 # Create a smaller object
 set.seed(1234)
-randomSpecies5000 <- sample(taxa_names(ibd), 5000, replace=FALSE)
-myData <- prune_taxa(randomSpecies5000, myData)
+myData <- subset_samples(ibd, DiseaseState %in% c("nonIBD", "UC"))
+myData <- subset_samples(myData, age >13)
+randomSpecies1500 <- sample(taxa_names(myData), 1500, replace=FALSE)
+myData <- prune_taxa(randomSpecies1500, myData)
 myData
 saveRDS(myData, "IBD_Phyloseq_Workshop.R")
 
@@ -86,27 +94,27 @@ Rel_abun_barplot
 Rel_abun_barplot.2 <- Rel_abun_barplot + facet_wrap(~DiseaseState, scales= "free_x")
 Rel_abun_barplot.2
 
-ggsave("output/Relative_Abundance_Phylum_Barplot.tiff", Rel_abun_barplot.2)
+ggsave("plots/Relative_Abundance_Phylum_Barplot.tiff", Rel_abun_barplot.2)
 
 # Visualize data on other metadata
 Rel_abun_barplot.3 <- Rel_abun_barplot +
-                        facet_wrap(activity~DiseaseState, scales= "free_x", nrow = 1)
+                        facet_wrap(activity~DiseaseState, scales= "free", nrow = 1)
 Rel_abun_barplot.3
 
-ggsave("output/Relative_Abundance_Phylum_Barplot_activity.tiff", Rel_abun_barplot.3)
+ggsave("plots/Relative_Abundance_Phylum_Barplot_activity.tiff", Rel_abun_barplot.3)
 
 # Visualize specific Phyla
 Firm <- subset_taxa(myData.rel, Phylum == "Firmicutes")
 
 plot_bar(Firm, fill = "Phylum") +
-  facet_wrap(activity~DiseaseState, scales= "free_x", nrow=1)
+  facet_wrap(activity~DiseaseState, scales= "free", nrow=1)
 
 Firm_abun_barplot <- plot_bar(Firm, fill = "Family", title = "Relative Abundance - Firmicutes") +
-                       facet_wrap(activity~DiseaseState, scales= "free_x", nrow=1) +
+                       facet_wrap(activity~DiseaseState, scales= "free", nrow=1) +
                        theme(legend.text = element_text(size = 4),
                              legend.key.size = unit(0.3, "cm"))
 Firm_abun_barplot
-ggsave("output/Firmicutes_Abundance_Barplot.tiff", Firm_abun_barplot)
+ggsave("plots/Firmicutes_Abundance_Barplot.tiff", Firm_abun_barplot)
 ```
 ## Alpha Diversity
 In microbiome studies, **alpha diversity** refers to how many different taxa are present (richness) and how evenly those taxa are distributed (evenness) within a single ecological community or sample. Alpha diversity metrics help characterize the complexity of a microbial community by quantifying not only the total number of species or operational taxonomic units (OTUs/ASVs), but also how dominant or rare those species are relative to one another.
@@ -122,20 +130,22 @@ In phyloseq, the function plot_richness() provides a convenient way to compute a
 
 Together, these metrics offer complementary perspectives on community structure, enabling a more comprehensive characterization of within-sample microbial diversity.
 ``` {r alpha}
+# Let's caculate alpha diversity
 alpha <- estimate_richness(myData)
+head(alpha)
 write.csv(alpha, "files/Alpha_Diversity.csv")
 
 plot_richness(myData)
 plot_richness(myData, x = "DiseaseState")
-plot_richness(myData, measures = "Shannon", x = "DiseaseState", color = "activity")
-ad <- plot_richness(myData, measures = "Shannon", x = "DiseaseState", color = "activity")
+plot_richness(myData, measures = "Shannon", x = "DiseaseState")
+ad <- plot_richness(myData, measures = "Shannon", x = "DiseaseState", color = "activity", shape = "abx")
 ad
-ggsave("output/Alpha_Diversity_Shannon.tiff", ad)
+ggsave("plots/Alpha_Diversity_Shannon.tiff", ad)
 
 # What happens when we use our relative abundance data?
 plot_richness(myData.rel, x = "DiseaseState") # this should return an error
-plot_richness(myData.rel, methods = "Shannon", x = "DiseaseState")
-ad.rel <- plot_richness(myData.rel, measures = "Shannon", x = "DiseaseState", color = "age", shape = "gender")
+plot_richness(myData.rel, measures = "Shannon", x = "DiseaseState")
+ad.rel <- plot_richness(myData.rel, measures = "Shannon", x = "DiseaseState", color = "activity", shape = "abx")
 ad / ad.rel
 ```
 ## Beta Diversity and PERMONOVA
@@ -149,11 +159,10 @@ distanceMethodList
 # Let's use Bray-Curtis dissimilarity
 Dist <- distance(myData, method="bray")
 Dist
-write.csv(Dist, "files/Distance_matrix_Bray.csv)
 
 PCoA <- ordinate(myData, "PCoA", distance=Dist)
-PCoA$vectors #ordination results are in 'vectors'
-write.csv(PCoA$vectors, "files/Bray_ordination.csv)
+head(PCoA$vectors) #ordination results are in 'vectors'
+write.csv(PCoA$vectors, "files/Bray_ordination.csv")
 
 bray <- plot_ordination(myData, PCoA, color="DiseaseState")
 bray
@@ -164,8 +173,8 @@ adonis_res <- adonis2(Dist ~ myData@sam_data$DiseaseState)
 adonis_res
 
 bray <- bray + stat_ellipse() +
-          labs(title = "Beta-Diversity",
-               subtitle = paste("Bray-Curtis, p =", format(adonis_res$`Pr(>F)`[1])))
-
-ggsave("output/Bray-Curtis_dissimilarity.tiff", bray)
+  labs(title = "Beta-Diversity",
+       subtitle = paste("Bray-Curtis, p =", format(adonis_res$`Pr(>F)`[1])))
+bray
+ggsave("plots/Bray-Curtis_dissimilarity.tiff", bray)
 ```
