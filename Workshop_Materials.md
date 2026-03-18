@@ -12,7 +12,7 @@ We will be using phyloseq version 5.2.1 during this workshop. Before attending, 
 ``` {r setup}
 # Install required packages:
 
-install.packages(c("Phyloseq", "vegan", "ape", "dplyr", "ggplot2", "ggpubr", "corncob", "patchwork"))
+install.packages(c("phyloseq", "vegan", "ape", "dplyr", "ggplot2", "ggpubr", "corncob", "patchwork"))
 ```
 After installing all packages, restart your RStudio. This allows for all libraries to load cleanly and ensures that any cached or corrupted session data doesn’t interfere with the newly installed packages.
 
@@ -20,7 +20,14 @@ After installing all packages, restart your RStudio. This allows for all librari
 On the day of the workshop, please ensure that you have loaded the required R packages. The microbiome data we will be using are provided in the corncob package, specifically fecal microbiome profiles from patients with and without inflammatory bowel disease (IBD), along with other relevant patient‑level metadata. These data originate from the following publication, which examined microbial community structure in relation to IBD status: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0039242
 ``` {r download}
 # Load packages
-library(c("Phyloseq", "vegan", "ape", "dplyr", "ggplot2", "ggpubr", "corncob", "patchwork"))
+library("phyloseq")
+library("vegan")
+library("ape")
+library("dplyr") 
+library("ggplot2")
+library("ggpubr")
+library("corncob")
+library("patchwork")
 
 # Download data from the corncob package
 data("ibd_phylo_sample")
@@ -59,9 +66,8 @@ View(ibd@sam_data)
 
 # Create a smaller object
 set.seed(1234)
-myData <- subset_samples(ibd, DiseaseState %in% c("UC", "nonIBD"))
-random_samples <- sample(sample_names(myData), 12)
-myData <- prune_samples(random_samples, myData)
+randomSpecies5000 <- sample(taxa_names(ibd), 5000, replace=FALSE)
+myData <- prune_taxa(randomSpecies5000, myData)
 myData
 saveRDS(myData, "IBD_Phyloseq_Workshop.R")
 
